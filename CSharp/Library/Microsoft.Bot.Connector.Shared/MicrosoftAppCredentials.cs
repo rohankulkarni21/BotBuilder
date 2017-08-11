@@ -250,7 +250,8 @@ namespace Microsoft.Bot.Connector
                         response.EnsureSuccessStatusCode();
                         body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         var oauthResponse = JsonConvert.DeserializeObject<OAuthResponse>(body);
-                        oauthResponse.expiration_time = DateTime.UtcNow.AddSeconds(oauthResponse.expires_in).Subtract(TimeSpan.FromSeconds(60));
+                        // #17601 Continuity: SDK's should refresh the token after 30 minutes rather than 60 minutes
+                        oauthResponse.expiration_time = DateTime.UtcNow.AddSeconds(oauthResponse.expires_in).Subtract(TimeSpan.FromSeconds(1800));
                         return oauthResponse;
                     }
                     catch (Exception error)

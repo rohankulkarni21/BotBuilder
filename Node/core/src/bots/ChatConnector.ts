@@ -663,7 +663,8 @@ export class ChatConnector implements IConnector, IBotStorage {
                         // new token before it expires.
                         var oauthResponse = JSON.parse(body);
                         this.accessToken = oauthResponse.access_token;
-                        this.accessTokenExpires = new Date().getTime() + ((oauthResponse.expires_in - 300) * 1000);
+                        // #17601 Continuity: SDK's should refresh the token after 30 minutes rather than 60 minutes
+                        this.accessTokenExpires = new Date().getTime() + ((oauthResponse.expires_in - 1800) * 1000);
                         cb(null, this.accessToken);
                     } else {
                         cb(new Error('Refresh access token failed with status code: ' + response.statusCode), null);
