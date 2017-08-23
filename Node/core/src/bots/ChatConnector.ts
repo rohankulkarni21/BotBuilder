@@ -684,29 +684,25 @@ export class ChatConnector implements IConnector, IBotStorage {
     }
 
     public getAccessToken(cb: (err: Error, accessToken: string) => void): void {
-        if (this.accessToken != null && !this.tokenExpired() && !this.tokenHalfWayExpired()) {
+        if (this.accessToken == null || this.tokenExpired()) {
+            // Refresh access token with error handling
+            this.refreshAccessToken((err, token) => {
+                cb(err, this.accessToken);
+            });
+         
+        }
+        else if (this.tokenHalfWayExpired()) {
+            // Refresh access token without error handling
+            var oldToken = this.accessToken;
+            this.refreshAccessToken((err, token) => {
+                if (!err)
+                    cb(null, this.accessToken);
+                else
+                    cb(null, oldToken);
+            });
+        }
+        else
             cb(null, this.accessToken);
-        }
-        else {
-            if (this.tokenHalfWayExpired()) {
-                // Refresh access token without exception handling
-                this.refreshAccessToken((err, token) => {
-                    if (!err)
-                        cb(null, this.accessToken);
-                });
-            }
-            else {  // if token expired or not available in cache
-                // Refresh access token with exception handling
-                this.refreshAccessToken((err, token) => {
-                    if (err) {
-                        cb(err, null);
-                    }
-                    else {
-                        cb(null, this.accessToken);
-                    }
-                });
-            } 
-        }
     }
 
     private addUserAgent(options: request.Options): void {

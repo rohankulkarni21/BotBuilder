@@ -168,25 +168,27 @@ namespace Microsoft.Bot.Connector
 
         public async Task<string> GetTokenAsync(bool forceRefresh = false)
         {
-            string token = string.Empty;
             OAuthResponse oAuthToken;
-            if (cache.TryGetValue(TokenCacheKey, out oAuthToken) && !forceRefresh && TokenNotExpired(oAuthToken) && !TokenHalfwayExpired(oAuthToken))
-            {
-                token = oAuthToken.access_token;
-            }
-            else if (oAuthToken != null && TokenHalfwayExpired(oAuthToken) )
-            {
-                token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
-            }
-            else  // Token expired, force refresh or token not available in cache
+            bool tokenInCache = cache.TryGetValue(TokenCacheKey, out oAuthToken);
+            string token = tokenInCache ? oAuthToken.access_token : null;
+            if (!tokenInCache || !TokenNotExpired(oAuthToken)) 
             {
                 try
                 {
                     token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
                 }
-                catch (OAuthException ex)
+                catch (OAuthException)  
                 {
-                    throw new OAuthException(ex.Message, ex);
+                    throw;
+                }
+            }
+            else if (TokenHalfwayExpired(oAuthToken))
+            {
+                string oldToken = token;
+                token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(token))
+                {
+                    token = oldToken;
                 }
             }
             return token;
@@ -200,9 +202,9 @@ namespace Microsoft.Bot.Connector
                 cache.AddOrUpdate(TokenCacheKey, oAuthToken, (key, oldToken) => oAuthToken);
                 return oAuthToken.access_token;
             }
-            catch (OAuthException ex)
+            catch (OAuthException)
             {
-                throw new OAuthException(ex.Message, ex);
+                throw;
             }
         }
 
