@@ -168,19 +168,42 @@ namespace Microsoft.Bot.Connector
 
         public async Task<string> GetTokenAsync(bool forceRefresh = false)
         {
-            string token;
+            string token = string.Empty;
             OAuthResponse oAuthToken;
-            if (cache.TryGetValue(TokenCacheKey, out oAuthToken) && !forceRefresh && TokenNotExpired(oAuthToken))
+            if (cache.TryGetValue(TokenCacheKey, out oAuthToken) && !forceRefresh && TokenNotExpired(oAuthToken) && !TokenHalfwayExpired(oAuthToken))
             {
                 token = oAuthToken.access_token;
             }
-            else
+            else if (oAuthToken != null && TokenHalfwayExpired(oAuthToken) )
+            {
+                token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
+            }
+            else  // Token expired, force refresh or token not available in cache
+            {
+                try
+                {
+                    token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
+                }
+                catch (OAuthException ex)
+                {
+                    throw new OAuthException(ex.Message, ex);
+                }
+            }
+            return token;
+        }
+
+        private async Task<string> RefreshAndStoreToken(OAuthResponse oAuthToken)
+        {
+            try
             {
                 oAuthToken = await RefreshTokenAsync().ConfigureAwait(false);
                 cache.AddOrUpdate(TokenCacheKey, oAuthToken, (key, oldToken) => oAuthToken);
-                token = oAuthToken.access_token;
+                return oAuthToken.access_token;
             }
-            return token;
+            catch (OAuthException ex)
+            {
+                throw new OAuthException(ex.Message, ex);
+            }
         }
 
         private bool ShouldSetToken(HttpRequestMessage request)
@@ -250,8 +273,7 @@ namespace Microsoft.Bot.Connector
                         response.EnsureSuccessStatusCode();
                         body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         var oauthResponse = JsonConvert.DeserializeObject<OAuthResponse>(body);
-                        // #17601 Continuity: SDK's should refresh the token after 30 minutes rather than 60 minutes
-                        oauthResponse.expiration_time = DateTime.UtcNow.AddSeconds(oauthResponse.expires_in).Subtract(TimeSpan.FromSeconds(1800));
+                        oauthResponse.expiration_time = DateTime.UtcNow.AddSeconds(oauthResponse.expires_in).Subtract(TimeSpan.FromSeconds(60));
                         return oauthResponse;
                     }
                     catch (Exception error)
@@ -265,6 +287,14 @@ namespace Microsoft.Bot.Connector
         private bool TokenNotExpired(OAuthResponse token)
         {
             return token.expiration_time > DateTime.UtcNow;
+        }
+
+        private bool TokenHalfwayExpired(OAuthResponse token, int secondsToHalfwayExpire = 1800, int secondsToExpire = 60)
+        {
+            TimeSpan TimeToExpiration = token.expiration_time - DateTime.UtcNow;
+            return TimeToExpiration.TotalSeconds > 0 
+                && Math.Abs(TimeToExpiration.TotalSeconds) < secondsToHalfwayExpire 
+                && Math.Abs(TimeToExpiration.TotalSeconds) > secondsToExpire;
         }
 
         protected class OAuthResponse
