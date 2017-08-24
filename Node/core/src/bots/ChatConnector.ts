@@ -648,9 +648,8 @@ export class ChatConnector implements IConnector, IBotStorage {
 
     private tokenHalfWayExpired(secondstoHalfWayExpire: number = 1800, secondsToExpire: number = 300): boolean {
         var timeToExpiration = (this.accessTokenExpires - Date.now())/1000;
-        return timeToExpiration > 0 
-        && Math.abs(timeToExpiration) < secondstoHalfWayExpire 
-        && Math.abs(timeToExpiration) > secondsToExpire;
+        return timeToExpiration < secondstoHalfWayExpire 
+            && timeToExpiration > secondsToExpire;
     }
 
     private refreshAccessToken(cb: (err: Error, accessToken: string) => void): void {

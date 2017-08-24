@@ -294,9 +294,8 @@ namespace Microsoft.Bot.Connector
         private bool TokenHalfwayExpired(OAuthResponse token, int secondsToHalfwayExpire = 1800, int secondsToExpire = 60)
         {
             TimeSpan TimeToExpiration = token.expiration_time - DateTime.UtcNow;
-            return TimeToExpiration.TotalSeconds > 0 
-                && Math.Abs(TimeToExpiration.TotalSeconds) < secondsToHalfwayExpire 
-                && Math.Abs(TimeToExpiration.TotalSeconds) > secondsToExpire;
+            return TimeToExpiration.TotalSeconds < secondsToHalfwayExpire
+                && TimeToExpiration.TotalSeconds > secondsToExpire;
         }
 
         protected class OAuthResponse
