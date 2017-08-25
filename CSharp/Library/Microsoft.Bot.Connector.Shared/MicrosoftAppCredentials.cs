@@ -171,21 +171,14 @@ namespace Microsoft.Bot.Connector
             OAuthResponse oAuthToken;
             bool tokenInCache = cache.TryGetValue(TokenCacheKey, out oAuthToken);
             string token = tokenInCache ? oAuthToken.access_token : null;
-            if (!tokenInCache || !TokenNotExpired(oAuthToken)) 
+            if (!tokenInCache || !TokenNotExpired(oAuthToken) || forceRefresh) 
             {
-                try
-                {
-                    token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
-                }
-                catch (OAuthException)  
-                {
-                    throw;
-                }
+                token = await RefreshAndStoreToken().ConfigureAwait(false);
             }
             else if (TokenHalfwayExpired(oAuthToken))
             {
                 string oldToken = token;
-                token = await RefreshAndStoreToken(oAuthToken).ConfigureAwait(false);
+                token = await RefreshAndStoreToken().ConfigureAwait(false);
                 if (string.IsNullOrEmpty(token))
                 {
                     token = oldToken;
@@ -194,11 +187,11 @@ namespace Microsoft.Bot.Connector
             return token;
         }
 
-        private async Task<string> RefreshAndStoreToken(OAuthResponse oAuthToken)
+        private async Task<string> RefreshAndStoreToken()
         {
             try
             {
-                oAuthToken = await RefreshTokenAsync().ConfigureAwait(false);
+                OAuthResponse oAuthToken = await RefreshTokenAsync().ConfigureAwait(false);
                 cache.AddOrUpdate(TokenCacheKey, oAuthToken, (key, oldToken) => oAuthToken);
                 return oAuthToken.access_token;
             }
@@ -291,8 +284,9 @@ namespace Microsoft.Bot.Connector
             return token.expiration_time > DateTime.UtcNow;
         }
 
-        private bool TokenHalfwayExpired(OAuthResponse token, int secondsToHalfwayExpire = 1800, int secondsToExpire = 60)
+        private bool TokenHalfwayExpired(OAuthResponse token,  int secondsToExpire = 60)
         {
+            int secondsToHalfwayExpire = Math.Min(token.expires_in / 2, 1800);
             TimeSpan TimeToExpiration = token.expiration_time - DateTime.UtcNow;
             return TimeToExpiration.TotalSeconds < secondsToHalfwayExpire
                 && TimeToExpiration.TotalSeconds > secondsToExpire;
