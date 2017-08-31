@@ -175,7 +175,7 @@ namespace Microsoft.Bot.Connector
             {
                 token = await RefreshAndStoreToken().ConfigureAwait(false);
             }
-            else if (TokenHalfwayExpired(oAuthToken))
+            else if (!TokenWithinSafeTimeLimits(oAuthToken))
             {
                 string oldToken = token;
                 token = await RefreshAndStoreToken().ConfigureAwait(false);
@@ -284,12 +284,11 @@ namespace Microsoft.Bot.Connector
             return token.expiration_time > DateTime.UtcNow;
         }
 
-        private bool TokenHalfwayExpired(OAuthResponse token,  int secondsToExpire = 60)
+        private bool TokenWithinSafeTimeLimits(OAuthResponse token)
         {
             int secondsToHalfwayExpire = Math.Min(token.expires_in / 2, 1800);
             TimeSpan TimeToExpiration = token.expiration_time - DateTime.UtcNow;
-            return TimeToExpiration.TotalSeconds < secondsToHalfwayExpire
-                && TimeToExpiration.TotalSeconds > secondsToExpire;
+            return TimeToExpiration.TotalSeconds > secondsToHalfwayExpire;
         }
 
         protected class OAuthResponse
