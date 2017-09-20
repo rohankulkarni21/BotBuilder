@@ -205,9 +205,19 @@ var ChatConnector = (function () {
                 if (!err) {
                     try {
                         var obj = typeof body === 'string' ? JSON.parse(body) : body;
-                        if (obj && obj.hasOwnProperty('id')) {
+                        if(obj && ((address.channelId === 'skypeforbusiness' && obj.hasOwnProperty('Id')) || (obj && obj.hasOwnProperty('id') && address.channelId !== 'skypeforbusiness') ))
+                        {
                             adr = utils.clone(address);
-                            adr.conversation = { id: obj['id'] };
+                            
+                            if(address.channelId === 'skypeforbusiness')
+                            {
+                                adr.conversation = { id: obj['Id'] };
+                                adr.serviceUrl = obj['ServiceUrl'];
+                            }
+                            else{
+                                adr.conversation = { id: obj['id'] };                                
+                            }
+                           
                             if (adr.id) {
                                 delete adr.id;
                             }
@@ -463,7 +473,9 @@ var ChatConnector = (function () {
         var address = msg.address;
         msg['from'] = address.bot;
         msg['recipient'] = address.user;
-        delete msg.address;
+        if (address.channelId !== 'skypeforbusiness') {
+            delete msg.address;
+        }
         if (msg.type === 'message' && !msg.inputHint) {
             msg.inputHint = lastMsg ? 'acceptingInput' : 'ignoringInput';
         }
